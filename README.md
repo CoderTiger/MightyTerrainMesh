@@ -7,7 +7,7 @@ Fixed two issues below,
 
 Other changes,
 1. Add mesh collider on loading mesh.
-2. Set layer as "Ground" on loading mesh
+2. Set layer as "Ground" on loading mesh.
 
 # MightyTerrainMesh
 A Unity Plugin for Converting Terrain 2 Mesh with LOD & QaudTree infomation.
