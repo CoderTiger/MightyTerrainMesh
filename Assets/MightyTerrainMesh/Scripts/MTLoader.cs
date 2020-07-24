@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using MightyTerrainMesh;
@@ -29,6 +29,7 @@ internal class MTPatch
     public uint PatchId { get; private set; }
     private GameObject mGo;
     private MeshFilter mMesh;
+    private MeshCollider mCollider;// added by Coder Tiger
     public MTPatch(Material[] mats)
     {
         mGo = new GameObject("_mtpatch");
@@ -36,12 +37,18 @@ internal class MTPatch
         mMesh = mGo.AddComponent<MeshFilter>();
         meshR = mGo.AddComponent<MeshRenderer>();
         meshR.materials = mats;
+        // added by Coder Tiger
+        mCollider = mGo.AddComponent<MeshCollider>();
+        mGo.layer = LayerMaskExtension.groundLayer;
     }
     public void Reset(uint id, Mesh m)
     {
         mGo.SetActive(true);
         PatchId = id;
         mMesh.mesh = m;
+        // added by Coder Tiger
+        GameObject.Destroy(mCollider);
+        mCollider = mGo.AddComponent<MeshCollider>();
     }
     private void DestroySelf()
     {
@@ -49,6 +56,7 @@ internal class MTPatch
             MonoBehaviour.Destroy(mGo);
         mGo = null;
         mMesh = null;
+        mCollider = null;// added by Coder Tiger
     }
 }
 internal class MTRuntimeMesh
