@@ -1,4 +1,4 @@
-﻿namespace MightyTerrainMesh
+namespace MightyTerrainMesh
 {
     using System.Collections;
     using System.Collections.Generic;
@@ -16,7 +16,7 @@
             sBuff = BitConverter.GetBytes(v.z);
             stream.Write(sBuff, 0, sBuff.Length);
         }
-        private static Vector3 ReadVector3(FileStream stream)
+        private static Vector3 ReadVector3(Stream stream)
         {
             Vector3 v = Vector3.zero;
             byte[] sBuff = new byte[sizeof(float)];
@@ -35,7 +35,7 @@
             sBuff = BitConverter.GetBytes(v.y);
             stream.Write(sBuff, 0, sBuff.Length);
         }
-        private static Vector2 ReadVector2(FileStream stream)
+        private static Vector2 ReadVector2(Stream stream)
         {
             Vector2 v = Vector2.zero;
             byte[] sBuff = new byte[sizeof(float)];
@@ -76,9 +76,15 @@
         public static MTQuadTreeHeader LoadQuadTreeHeader(string dataName)
         {
             MTQuadTreeHeader header = new MTQuadTreeHeader(dataName);
+#if UNITY_EDITOR
             string path = string.Format("{0}/MightyTerrainMesh/Resources/{1}.bytes",
                 Application.dataPath, dataName);
             FileStream stream = File.Open(path, FileMode.Open);
+#else// !UNITY_EDITOR
+            string path = string.Format("{0}", dataName);
+            TextAsset asset = Resources.Load<TextAsset>(path);
+            Stream stream = new MemoryStream(asset.bytes);
+#endif
             byte[] nBuff = new byte[sizeof(int)];
             stream.Read(nBuff, 0, sizeof(int));
             header.QuadTreeDepth = BitConverter.ToInt32(nBuff, 0);
@@ -153,9 +159,15 @@
         private static List<int> _intCache = new List<int>();
         public static void LoadMesh(Mesh[] meshes, string dataName, int meshId)
         {
+#if UNITY_EDITOR
             string path = string.Format("{0}/MightyTerrainMesh/Resources/{1}_{2}.bytes",
                 Application.dataPath, dataName, meshId);
             FileStream stream = File.Open(path, FileMode.Open);
+#else// !UNITY_EDITOR
+            string path = string.Format("{0}_{1}", dataName, meshId);
+            TextAsset asset = Resources.Load<TextAsset>(path);
+            Stream stream = new MemoryStream(asset.bytes);
+#endif
             _vec2Cache.Clear();
             _intCache.Clear();
             //lods 
