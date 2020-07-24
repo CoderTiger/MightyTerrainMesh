@@ -1,4 +1,5 @@
-﻿using System.Collections;
+#if UNITY_EDITOR
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -187,7 +188,6 @@ public class MTMeshCreator : MonoBehaviour
             DestroyImmediate(t.gameObject);
         }
     }
-#if UNITY_EDITOR
     private void OnDrawGizmos()
     {
         if (!DrawGizmo)
@@ -215,5 +215,5 @@ public class MTMeshCreator : MonoBehaviour
             }
         }
     }
-#endif
 }
+#endif

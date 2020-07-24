@@ -1,4 +1,5 @@
-﻿namespace MightyTerrainMesh
+#if UNITY_EDITOR
+namespace MightyTerrainMesh
 {
     using System.Collections;
     using System.Collections.Generic;
@@ -333,3 +334,4 @@
         }
     }
 }
+#endif
