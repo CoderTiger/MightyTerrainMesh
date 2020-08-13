@@ -1,18 +1,20 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using MightyTerrainMesh;
 
 internal class MTPatch
 {
+    private bool _addMeshCollider = false;
+    private int _meshLayer = 0;
     private static Queue<MTPatch> _qPool = new Queue<MTPatch>();
-    public static MTPatch Pop(Material[] mats)
+    public static MTPatch Pop(Material[] mats, bool addMeshCollider, int meshLayer)
     {
         if (_qPool.Count > 0)
         {
             return _qPool.Dequeue();
         }
-        return new MTPatch(mats);
+        return new MTPatch(mats, addMeshCollider, meshLayer);
     }
     public static void Push(MTPatch p)
     {
@@ -29,26 +31,34 @@ internal class MTPatch
     public uint PatchId { get; private set; }
     private GameObject mGo;
     private MeshFilter mMesh;
-    private MeshCollider mCollider;// added by Coder Tiger
-    public MTPatch(Material[] mats)
+    private MeshCollider mCollider;
+    public MTPatch(Material[] mats, bool addMeshCollider, int meshLayer)
     {
+        _addMeshCollider = addMeshCollider;
+        _meshLayer = meshLayer;
+
         mGo = new GameObject("_mtpatch");
         MeshRenderer meshR;
         mMesh = mGo.AddComponent<MeshFilter>();
         meshR = mGo.AddComponent<MeshRenderer>();
         meshR.materials = mats;
         // added by Coder Tiger
-        mCollider = mGo.AddComponent<MeshCollider>();
-        mGo.layer = LayerMaskExtension.groundLayer;
+        if (_addMeshCollider)
+        {
+            mCollider = mGo.AddComponent<MeshCollider>();
+        }
+        mGo.layer = _meshLayer;
     }
     public void Reset(uint id, Mesh m)
     {
         mGo.SetActive(true);
         PatchId = id;
         mMesh.mesh = m;
-        // added by Coder Tiger
-        GameObject.Destroy(mCollider);
-        mCollider = mGo.AddComponent<MeshCollider>();
+        if (_addMeshCollider)
+        {
+            GameObject.Destroy(mCollider);
+            mCollider = mGo.AddComponent<MeshCollider>();
+        }
     }
     private void DestroySelf()
     {
@@ -56,7 +66,7 @@ internal class MTPatch
             MonoBehaviour.Destroy(mGo);
         mGo = null;
         mMesh = null;
-        mCollider = null;// added by Coder Tiger
+        mCollider = null;
     }
 }
 internal class MTRuntimeMesh
@@ -81,6 +91,10 @@ public class MTLoader : MonoBehaviour
     public string DataName = "";
     [Header("LOD distance")]
     public float[] lodPolicy = new float[1] { 0 };
+    // added by Coder Tiger
+    public bool addMeshCollider = false;
+    [SerializeField, Layer] public int meshLayer = 0;
+
     private Camera mCamera;
     private MTQuadTreeHeader mHeader;
     private MTQuadTreeNode mRoot;
@@ -170,7 +184,7 @@ public class MTLoader : MonoBehaviour
                 Mesh m = GetMesh(pId);
                 if (m != null)
                 {
-                    MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats);
+                    MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats, addMeshCollider, meshLayer);
                     patch.Reset(pId, m);
                     mPatchesFlipBuffer.Add(pId, patch);
                 }
