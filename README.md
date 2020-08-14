@@ -6,8 +6,8 @@ Fixed two issues below,
 2. Cannot load mesh on iOS device because not using Resources.Load.
 
 Other changes,
-1. Add mesh collider on loading mesh.
-2. Set layer as "Ground" on loading mesh.
+1. Add mesh collider on loading mesh (configurable in inspector).
+2. Set layer as "Ground" on loading mesh (configurable in inspector).
 
 # MightyTerrainMesh
 A Unity Plugin for Converting Terrain 2 Mesh with LOD & QaudTree infomation.
