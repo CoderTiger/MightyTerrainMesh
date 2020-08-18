@@ -8,6 +8,7 @@ Fixed two issues below,
 Other changes,
 1. Add mesh collider on loading mesh (configurable in inspector).
 2. Set layer as "Ground" on loading mesh (configurable in inspector).
+3. Name mesh gameobject with its ID as the tail on creating preview.
 
 # MightyTerrainMesh
 A Unity Plugin for Converting Terrain 2 Mesh with LOD & QaudTree infomation.
