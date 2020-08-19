@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using MightyTerrainMesh;
@@ -73,27 +73,49 @@ internal class MTRuntimeMesh
 {
     public int MeshID { get; private set; }
     private Mesh[] mLOD;
+    private MTLoader.LoadMode _loadMode = MTLoader.LoadMode.SpeedOptimized;
     public MTRuntimeMesh(int meshid, int lod, string dataName)
     {
         MeshID = meshid;
         mLOD = new Mesh[lod];
+        _loadMode = MTLoader.LoadMode.SpeedOptimized;
         MTFileUtils.LoadMesh(mLOD, dataName, meshid);
+    }
+    public MTRuntimeMesh(uint patchId, string dataName)
+    {
+        //MeshID = (int)(patchId >> 2);
+        (int meshID, int lod) = MTLoader.SplitPatchId(patchId);
+        MeshID = meshID;
+        mLOD = new Mesh[1];
+        _loadMode = MTLoader.LoadMode.MemoryOptimized;
+        MTFileUtils.LoadMesh(mLOD, dataName, MeshID, lod);
     }
     public Mesh GetMesh(int lod)
     {
-        lod = Mathf.Clamp(lod, 0, mLOD.Length - 1);
-        return mLOD[lod];
+        if (_loadMode == MTLoader.LoadMode.SpeedOptimized)
+        {
+            lod = Mathf.Clamp(lod, 0, mLOD.Length - 1);
+            return mLOD[lod];
+        }
+        return mLOD[0];
     }
 }
 
 public class MTLoader : MonoBehaviour
 {
+    public enum LoadMode
+    {
+        SpeedOptimized,
+        MemoryOptimized
+    }
+
     public string DataName = "";
     [Header("LOD distance")]
     public float[] lodPolicy = new float[1] { 0 };
-    // added by Coder Tiger
+    [Header("Advanced")]
     public bool addMeshCollider = false;
     [SerializeField, Layer] public int meshLayer = 0;
+    public LoadMode loadMode = LoadMode.SpeedOptimized;
 
     private Camera mCamera;
     private MTQuadTreeHeader mHeader;
@@ -102,20 +124,41 @@ public class MTLoader : MonoBehaviour
     private MTArray<uint> mVisiblePatches;
     private Dictionary<uint, MTPatch> mActivePatches = new Dictionary<uint, MTPatch>();
     private Dictionary<uint, MTPatch> mPatchesFlipBuffer = new Dictionary<uint, MTPatch>();
+    private Dictionary<uint, MTRuntimeMesh> mActiveMeshes = new Dictionary<uint, MTRuntimeMesh>();
     //meshes
     private Dictionary<int, MTRuntimeMesh> mMeshPool = new Dictionary<int, MTRuntimeMesh>();
     private bool mbDirty = true;
-    private Mesh GetMesh(uint patchId)
+    static public (int, int) SplitPatchId(uint patchId)
     {
         int mId = (int)(patchId >> 2);
         int lod = (int)(patchId & 0x00000003);
-        if (mMeshPool.ContainsKey(mId))
+        return (mId, lod);
+    }
+    private Mesh GetMesh(uint patchId)
+    {
+        if (loadMode == LoadMode.SpeedOptimized)
         {
-            return mMeshPool[mId].GetMesh(lod);
+            (int mId, int lod) = SplitPatchId(patchId);
+            if (mMeshPool.ContainsKey(mId))
+            {
+                return mMeshPool[mId].GetMesh(lod);
+            }
+            MTRuntimeMesh rm = new MTRuntimeMesh(mId, mHeader.LOD, mHeader.DataName);
+            mMeshPool.Add(mId, rm);
+            return rm.GetMesh(lod);
         }
-        MTRuntimeMesh rm = new MTRuntimeMesh(mId, mHeader.LOD, mHeader.DataName);
-        mMeshPool.Add(mId, rm);
-        return rm.GetMesh(lod);
+        return GetActiveMesh(patchId);
+    }
+    private Mesh GetActiveMesh(uint patchId)
+    {
+        Debug.Assert(loadMode == LoadMode.MemoryOptimized, string.Format("loadMode SHOULD be LoadMode.MemoryOptimized but {0}", loadMode));
+        if (mActiveMeshes.ContainsKey(patchId))
+        {
+            return mActiveMeshes[patchId].GetMesh(0);
+        }
+        MTRuntimeMesh rm = new MTRuntimeMesh(patchId, mHeader.DataName);
+        mActiveMeshes.Add(patchId, rm);
+        return rm.GetMesh(0);
     }
     public void SetDirty()
     {

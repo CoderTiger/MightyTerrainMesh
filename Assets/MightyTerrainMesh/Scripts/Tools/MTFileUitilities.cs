@@ -218,5 +218,108 @@ namespace MightyTerrainMesh
             }
             stream.Close();
         }
+        public static void LoadMesh(Mesh[] meshes, string dataName, int meshId, int lod)
+        {
+            if (meshes.Length != 1)
+            {
+                MTLog.LogError(string.Format("meshes length SHOULD be 1 but {0}", meshes.Length));
+                return;
+            }
+
+#if UNITY_EDITOR
+            string path = string.Format("{0}/MightyTerrainMesh/Resources/{1}_{2}.bytes",
+                Application.dataPath, dataName, meshId);
+            FileStream stream = File.Open(path, FileMode.Open);
+#else// !UNITY_EDITOR
+            string path = string.Format("{0}_{1}", dataName, meshId);
+            TextAsset asset = Resources.Load<TextAsset>(path);
+            Stream stream = new MemoryStream(asset.bytes);
+#endif
+            _vec2Cache.Clear();
+            _intCache.Clear();
+            //lods 
+            byte[] nBuff = new byte[sizeof(int)];
+            stream.Read(nBuff, 0, sizeof(int));
+            int lods = BitConverter.ToInt32(nBuff, 0);
+            if (lod < 0 || lod >= lods)
+            {
+                MTLog.LogError(string.Format("Invalid lod, lods value: {0}, {1}", lod, lods));
+                return;
+            }
+            for (int l = 0; l < lods; ++l)
+            {
+                if (l == lod)
+                {
+                    meshes[0] = new Mesh();
+                    //vertices
+                    _vec3Cache.Clear();
+                    nBuff = new byte[sizeof(int)];
+                    stream.Read(nBuff, 0, sizeof(int));
+                    int len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec3Cache.Add(ReadVector3(stream));
+                    meshes[0].vertices = _vec3Cache.ToArray();
+                    //normals
+                    _vec3Cache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec3Cache.Add(ReadVector3(stream));
+                    meshes[0].normals = _vec3Cache.ToArray();
+                    //uvs
+                    _vec2Cache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec2Cache.Add(ReadVector2(stream));
+                    meshes[0].uv = _vec2Cache.ToArray();
+                    //faces
+                    _intCache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    byte[] fBuff = new byte[sizeof(int)];
+                    for (int i = 0; i < len; ++i)
+                    {
+                        stream.Read(fBuff, 0, sizeof(int));
+                        _intCache.Add(BitConverter.ToInt32(fBuff, 0));
+                    }
+                    meshes[0].triangles = _intCache.ToArray();
+                    break;
+                }
+                else
+                {
+                    //vertices
+                    _vec3Cache.Clear();
+                    nBuff = new byte[sizeof(int)];
+                    stream.Read(nBuff, 0, sizeof(int));
+                    int len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec3Cache.Add(ReadVector3(stream));
+                    //normals
+                    _vec3Cache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec3Cache.Add(ReadVector3(stream));
+                    //uvs
+                    _vec2Cache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    for (int i = 0; i < len; ++i)
+                        _vec2Cache.Add(ReadVector2(stream));
+                    //faces
+                    _intCache.Clear();
+                    stream.Read(nBuff, 0, sizeof(int));
+                    len = BitConverter.ToInt32(nBuff, 0);
+                    byte[] fBuff = new byte[sizeof(int)];
+                    for (int i = 0; i < len; ++i)
+                    {
+                        stream.Read(fBuff, 0, sizeof(int));
+                        _intCache.Add(BitConverter.ToInt32(fBuff, 0));
+                    }
+                }
+            }
+            stream.Close();
+        }
     }
 }
