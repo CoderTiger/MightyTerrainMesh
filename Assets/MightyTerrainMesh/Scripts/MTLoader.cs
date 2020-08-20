@@ -8,13 +8,21 @@ internal class MTPatch
     private bool _addMeshCollider = false;
     private int _meshLayer = 0;
     private static Queue<MTPatch> _qPool = new Queue<MTPatch>();
+#if DEBUG
+    public static MTPatch Pop(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod)
+#else// !DEBUG
     public static MTPatch Pop(Material[] mats, bool addMeshCollider, int meshLayer)
+#endif// DEBUG
     {
         if (_qPool.Count > 0)
         {
             return _qPool.Dequeue();
         }
+#if DEBUG
+        return new MTPatch(mats, addMeshCollider, meshLayer, meshId, lod);
+#else// !DEBUG
         return new MTPatch(mats, addMeshCollider, meshLayer);
+#endif
     }
     public static void Push(MTPatch p)
     {
@@ -32,12 +40,19 @@ internal class MTPatch
     private GameObject mGo;
     private MeshFilter mMesh;
     private MeshCollider mCollider;
+#if DEBUG
+    public MTPatch(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod)
+#else// !DEBUG
     public MTPatch(Material[] mats, bool addMeshCollider, int meshLayer)
+#endif// DEBUG
     {
         _addMeshCollider = addMeshCollider;
         _meshLayer = meshLayer;
-
+#if DEBUG
+        mGo = new GameObject(string.Format("_mtpatch_{0}_{1}", meshId, lod));
+#else// !DEBUG
         mGo = new GameObject("_mtpatch");
+#endif// DEBUG
         MeshRenderer meshR;
         mMesh = mGo.AddComponent<MeshFilter>();
         meshR = mGo.AddComponent<MeshRenderer>();
@@ -128,6 +143,9 @@ public class MTLoader : MonoBehaviour
     //meshes
     private Dictionary<int, MTRuntimeMesh> mMeshPool = new Dictionary<int, MTRuntimeMesh>();
     private bool mbDirty = true;
+
+    private IMTLoaderObserver _observer;
+
     static public (int, int) SplitPatchId(uint patchId)
     {
         int mId = (int)(patchId >> 2);
@@ -143,7 +161,21 @@ public class MTLoader : MonoBehaviour
             {
                 return mMeshPool[mId].GetMesh(lod);
             }
+            if (_observer != null)
+            {
+                for (int i = 0; i < mHeader.LOD; i++)
+                {
+                    _observer.BeforeLoadMesh(mId, i);
+                }
+            }
             MTRuntimeMesh rm = new MTRuntimeMesh(mId, mHeader.LOD, mHeader.DataName);
+            if (_observer != null)
+            {
+                for (int i = 0; i < mHeader.LOD; i++)
+                {
+                    _observer.AfterLoadMesh(mId, i);
+                }
+            }
             mMeshPool.Add(mId, rm);
             return rm.GetMesh(lod);
         }
@@ -156,7 +188,12 @@ public class MTLoader : MonoBehaviour
         {
             return mActiveMeshes[patchId].GetMesh(0);
         }
+        (int meshId, int lod) = SplitPatchId(patchId);
+        if (_observer != null)
+            _observer.BeforeLoadMesh(meshId, lod);
         MTRuntimeMesh rm = new MTRuntimeMesh(patchId, mHeader.DataName);
+        if (_observer != null)
+            _observer.AfterLoadMesh(meshId, lod);
         mActiveMeshes.Add(patchId, rm);
         return rm.GetMesh(0);
     }
@@ -200,7 +237,9 @@ public class MTLoader : MonoBehaviour
     }
     // Start is called before the first frame update
     void Start()
-    {}
+    {
+        _observer = GetComponent<IMTLoaderObserver>();
+    }
 
     // Update is called once per frame
     void Update()
@@ -227,18 +266,46 @@ public class MTLoader : MonoBehaviour
                 Mesh m = GetMesh(pId);
                 if (m != null)
                 {
+#if DEBUG
+                    (int meshId, int lod) = SplitPatchId(pId);
+                    MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats, addMeshCollider, meshLayer, meshId, lod);
+#else// !DEBUG
                     MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats, addMeshCollider, meshLayer);
+#endif// DEBUG
                     patch.Reset(pId, m);
                     mPatchesFlipBuffer.Add(pId, patch);
                 }
             }
         }
         Dictionary<uint, MTPatch>.Enumerator iPatch = mActivePatches.GetEnumerator();
-        while (iPatch.MoveNext())
+        Queue<uint> inactivePatcheIDs = new Queue<uint>();
+        if (_observer != null)
         {
-            MTPatch.Push(iPatch.Current.Value);
+            while (iPatch.MoveNext())
+            {
+                (int meshID, int lod) = SplitPatchId(iPatch.Current.Key);
+                inactivePatcheIDs.Enqueue(iPatch.Current.Key);
+                _observer.BeforeUnloadMesh(meshID, lod);
+                MTPatch.Push(iPatch.Current.Value);
+            }
+        }
+        else
+        {
+            while (iPatch.MoveNext())
+            {
+                MTPatch.Push(iPatch.Current.Value);
+            }
         }
         mActivePatches.Clear();
+        if (_observer != null)
+        {
+            foreach (uint patchID in inactivePatcheIDs)
+            {
+                (int meshID, int lod) = SplitPatchId(patchID);
+                _observer.AfterUnloadMesh(meshID, lod);
+            }
+            inactivePatcheIDs.Clear();
+        }
         Dictionary<uint, MTPatch> temp = mPatchesFlipBuffer;
         mPatchesFlipBuffer = mActivePatches;
         mActivePatches = temp;
