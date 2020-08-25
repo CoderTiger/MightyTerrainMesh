@@ -164,7 +164,7 @@ public class MTMeshCreator : MonoBehaviour
                 {
                     MeshFilter meshF;
                     MeshRenderer meshR;
-                    string meshGoName = string.Format("meshObj_{0}", m.MeshID);
+                    string meshGoName = string.Format("meshObj_{0}_{1}", m.MeshID, i);
                     GameObject meshGo = new GameObject(meshGoName);
                     meshGo.transform.parent = lodParent[i];
                     meshF = meshGo.AddComponent<MeshFilter>();
