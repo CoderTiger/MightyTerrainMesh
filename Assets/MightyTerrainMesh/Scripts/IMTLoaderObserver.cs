@@ -2,5 +2,6 @@ using UnityEngine;
 
 public interface IMTLoaderObserver
 {
-    void OnMeshUpdated(GameObject owner, int meshId, int lod);
+    void OnMeshLoaded(GameObject owner, int meshId, int lod);
+    void OnMeshUnloading(GameObject owner, int meshId, int lod);
 }

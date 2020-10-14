@@ -7,17 +7,33 @@ internal class MTPatch
 {
     private bool _addMeshCollider = false;
     private int _meshLayer = 0;
+    private int _meshId;
+    private int _lod;
+    private IMTLoaderObserver[] _loaderObservers;
     private static Queue<MTPatch> _qPool = new Queue<MTPatch>();
-    public static MTPatch Pop(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod)
+    public static MTPatch Pop(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod, IMTLoaderObserver[] observers)
     {
         if (_qPool.Count > 0)
         {
-            return _qPool.Dequeue();
+            MTPatch mTPatch = _qPool.Dequeue();
+            mTPatch._meshId = meshId;
+            mTPatch._lod = lod;
+            return mTPatch;
+            //return _qPool.Dequeue();
         }
-        return new MTPatch(mats, addMeshCollider, meshLayer, meshId, lod);
+        return new MTPatch(mats, addMeshCollider, meshLayer, meshId, lod, observers);
     }
     public static void Push(MTPatch p)
     {
+        p.OnMeshUnloading();
+        if (p._addMeshCollider)
+        {
+            MeshCollider meshCollider = p.mGo.GetComponent<MeshCollider>();
+            if (meshCollider != null)
+            {
+                GameObject.Destroy(meshCollider);
+            }
+        }
         p.mGo.SetActive(false);
         _qPool.Enqueue(p);
     }
@@ -28,14 +44,15 @@ internal class MTPatch
             _qPool.Dequeue().DestroySelf();
         }
     }
-    public uint PatchId { get; private set; }
     private GameObject mGo;
     private MeshFilter mMesh;
-    private MeshCollider mCollider;
-    public MTPatch(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod)
+    public MTPatch(Material[] mats, bool addMeshCollider, int meshLayer, int meshId, int lod, IMTLoaderObserver[] observers)
     {
         _addMeshCollider = addMeshCollider;
         _meshLayer = meshLayer;
+        _meshId = meshId;
+        _lod = lod;
+        _loaderObservers = observers;
         mGo = new GameObject(string.Format("_mtpatch_{0}_{1}", meshId, lod));
         MeshRenderer meshR;
         mMesh = mGo.AddComponent<MeshFilter>();
@@ -43,24 +60,15 @@ internal class MTPatch
         meshR.materials = mats;
         mGo.layer = _meshLayer;
     }
-    public void Reset(uint id, Mesh m, IMTLoaderObserver[] observers)
+    public void Reset(Mesh m)
     {
         mGo.SetActive(true);
-        PatchId = id;
         mMesh.mesh = m;
         if (_addMeshCollider)
         {
-            if (mCollider)
-            {
-                GameObject.Destroy(mCollider);
-            }
-            mCollider = mGo.AddComponent<MeshCollider>();
+            mGo.AddComponent<MeshCollider>();
         }
-        foreach (var observer in observers)
-        {
-            (int meshId, int lod) = MTLoader.SplitPatchId(PatchId);
-            observer.OnMeshUpdated(mGo, meshId, lod);
-        }
+        OnMeshLoaded();
     }
     private void DestroySelf()
     {
@@ -68,7 +76,20 @@ internal class MTPatch
             MonoBehaviour.Destroy(mGo);
         mGo = null;
         mMesh = null;
-        mCollider = null;
+    }
+    private void OnMeshLoaded()
+    {
+        foreach (var observer in _loaderObservers)
+        {
+            observer.OnMeshLoaded(mGo, _meshId, _lod);
+        }
+    }
+    private void OnMeshUnloading()
+    {
+        foreach (var observer in _loaderObservers)
+        {
+            observer.OnMeshUnloading(mGo, _meshId, _lod);
+        }
     }
 }
 internal class MTRuntimeMesh
@@ -161,7 +182,6 @@ public class MTLoader : MonoBehaviour
         {
             return mActiveMeshes[patchId].GetMesh(0);
         }
-        (int meshId, int lod) = SplitPatchId(patchId);
         MTRuntimeMesh rm = new MTRuntimeMesh(patchId, mHeader.DataName);
         mActiveMeshes.Add(patchId, rm);
         return rm.GetMesh(0);
@@ -236,8 +256,8 @@ public class MTLoader : MonoBehaviour
                 if (m != null)
                 {
                     (int meshId, int lod) = SplitPatchId(pId);
-                    MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats, addMeshCollider, meshLayer, meshId, lod);
-                    patch.Reset(pId, m, _loaderObservers);
+                    MTPatch patch = MTPatch.Pop(mHeader.RuntimeMats, addMeshCollider, meshLayer, meshId, lod, _loaderObservers);
+                    patch.Reset(m);
                     mPatchesFlipBuffer.Add(pId, patch);
                 }
             }
